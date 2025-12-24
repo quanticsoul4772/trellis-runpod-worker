@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (too large for git)
+models/
+*.ckpt
+*.safetensors
+*.bin
+
+# Logs
+*.log
+logs/
+
+# Testing artifacts
+output/
+*.glb
+*.obj

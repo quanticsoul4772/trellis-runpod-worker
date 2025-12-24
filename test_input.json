@@ -1,0 +1,8 @@
+{
+    "input": {
+        "prompt": "A wooden treasure chest with metal hinges and a brass lock",
+        "seed": 42,
+        "simplify": 0.95,
+        "texture_size": 1024
+    }
+}
