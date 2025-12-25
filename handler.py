@@ -6,8 +6,8 @@ Input:
     "input": {
         "prompt": "A wooden treasure chest",
         "seed": 42,                    # Optional, default: random
-        "simplify": 0.95,              # Optional, mesh simplification ratio
-        "texture_size": 1024           # Optional, texture resolution
+        "simplify": 0.95,              # Optional, mesh simplification ratio (0.0-1.0)
+        "texture_size": 1024           # Optional, texture resolution (128-4096)
     }
 }
 
@@ -20,38 +20,64 @@ Output:
 }
 """
 
+from __future__ import annotations
+
 import runpod
 import base64
+import logging
 import time
 import torch
 import random
 import os
 import sys
 from io import BytesIO
+from typing import Any, Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# Validation constants
+MAX_PROMPT_LENGTH = 1000
+MIN_TEXTURE_SIZE = 128
+MAX_TEXTURE_SIZE = 4096
+MIN_SIMPLIFY = 0.0
+MAX_SIMPLIFY = 1.0
 
 # Add TRELLIS to path
 sys.path.insert(0, '/app/trellis')
 
-print("=" * 60)
-print("TRELLIS Text-to-3D RunPod Worker Starting...")
-print(f"CUDA Available: {torch.cuda.is_available()}")
+logger.info("=" * 50)
+logger.info("TRELLIS Text-to-3D RunPod Worker Starting...")
+logger.info(f"CUDA Available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
-print("=" * 60)
+    logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+    logger.info(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+logger.info("=" * 50)
 
 # Global pipeline - loaded once at startup
 PIPELINE = None
 
 
-def load_pipeline():
-    """Load TRELLIS pipeline (called once at worker startup)."""
+def load_pipeline() -> Any:
+    """Load TRELLIS pipeline (called once at worker startup).
+
+    Returns:
+        TrellisTextTo3DPipeline: The loaded and GPU-ready pipeline.
+
+    Raises:
+        RuntimeError: If pipeline fails to load.
+    """
     global PIPELINE
 
     if PIPELINE is not None:
         return PIPELINE
 
-    print("Loading TRELLIS pipeline...")
+    logger.info("Loading TRELLIS pipeline...")
     start = time.time()
 
     try:
@@ -60,45 +86,106 @@ def load_pipeline():
         model_path = os.environ.get('TRELLIS_MODEL_PATH', 'microsoft/TRELLIS-text-xlarge')
 
         if os.path.exists(model_path):
-            print(f"Loading from local path: {model_path}")
+            logger.info(f"Loading from local path: {model_path}")
             PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
         else:
-            print(f"Loading from HuggingFace: {model_path}")
+            logger.info(f"Loading from HuggingFace: {model_path}")
             PIPELINE = TrellisTextTo3DPipeline.from_pretrained('microsoft/TRELLIS-text-xlarge')
 
         PIPELINE.cuda()
 
         elapsed = time.time() - start
-        print(f"TRELLIS pipeline loaded in {elapsed:.1f}s")
+        logger.info(f"TRELLIS pipeline loaded in {elapsed:.1f}s")
 
         return PIPELINE
 
     except Exception as e:
-        print(f"ERROR loading TRELLIS: {e}")
-        raise
+        logger.error(f"Failed to load TRELLIS pipeline: {e}")
+        raise RuntimeError(f"Pipeline initialization failed: {e}") from e
 
 
-def handler(event):
-    """Process a text-to-3D generation request."""
+def validate_input(job_input: dict[str, Any]) -> tuple[bool, Optional[str], dict[str, Any]]:
+    """Validate and normalize input parameters.
+
+    Args:
+        job_input: Raw input dictionary from the request.
+
+    Returns:
+        Tuple of (is_valid, error_message, validated_params).
+    """
+    # Validate prompt
+    prompt = job_input.get("prompt")
+    if not prompt:
+        return False, "Missing required 'prompt' parameter", {}
+    if not isinstance(prompt, str):
+        return False, "'prompt' must be a string", {}
+    prompt = prompt.strip()
+    if not prompt:
+        return False, "'prompt' cannot be empty or whitespace", {}
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        return False, f"'prompt' exceeds maximum length of {MAX_PROMPT_LENGTH} characters", {}
+
+    # Validate and normalize seed
+    seed = job_input.get("seed")
+    if seed is None:
+        seed = random.randint(0, 2**32 - 1)
+    elif not isinstance(seed, int):
+        return False, "'seed' must be an integer", {}
+    elif seed < 0 or seed > 2**32 - 1:
+        return False, "'seed' must be between 0 and 2^32-1", {}
+
+    # Validate and normalize simplify
+    simplify = job_input.get("simplify", 0.95)
+    if not isinstance(simplify, (int, float)):
+        return False, "'simplify' must be a number", {}
+    if simplify < MIN_SIMPLIFY or simplify > MAX_SIMPLIFY:
+        return False, f"'simplify' must be between {MIN_SIMPLIFY} and {MAX_SIMPLIFY}", {}
+
+    # Validate and normalize texture_size
+    texture_size = job_input.get("texture_size", 1024)
+    if not isinstance(texture_size, int):
+        return False, "'texture_size' must be an integer", {}
+    if texture_size < MIN_TEXTURE_SIZE or texture_size > MAX_TEXTURE_SIZE:
+        return False, f"'texture_size' must be between {MIN_TEXTURE_SIZE} and {MAX_TEXTURE_SIZE}", {}
+
+    return True, None, {
+        "prompt": prompt,
+        "seed": seed,
+        "simplify": float(simplify),
+        "texture_size": texture_size,
+    }
+
+
+def handler(event: dict[str, Any]) -> dict[str, Any]:
+    """Process a text-to-3D generation request.
+
+    Args:
+        event: RunPod event containing input parameters.
+
+    Returns:
+        Dictionary with GLB data and metadata, or error information.
+    """
     start_time = time.time()
 
     try:
         # Ensure pipeline is loaded
         pipeline = load_pipeline()
 
-        # Extract input parameters
+        # Extract and validate input parameters
         job_input = event.get("input", {})
-        prompt = job_input.get("prompt")
+        is_valid, error_msg, params = validate_input(job_input)
 
-        if not prompt:
-            return {"error": "Missing required 'prompt' parameter"}
+        if not is_valid:
+            logger.warning(f"Validation failed: {error_msg}")
+            return {"error": error_msg}
 
-        seed = job_input.get("seed", random.randint(0, 2**32 - 1))
-        simplify = job_input.get("simplify", 0.95)
-        texture_size = job_input.get("texture_size", 1024)
+        prompt = params["prompt"]
+        seed = params["seed"]
+        simplify = params["simplify"]
+        texture_size = params["texture_size"]
 
-        print(f"Generating 3D mesh for: '{prompt}'")
-        print(f"Settings: seed={seed}, simplify={simplify}, texture_size={texture_size}")
+        logger.info(f"Generating 3D mesh for: '{prompt[:50]}...' (len={len(prompt)})")
+        logger.info(f"Settings: seed={seed}, simplify={simplify}, texture_size={texture_size}")
 
         # Set random seed for reproducibility
         torch.manual_seed(seed)
@@ -111,7 +198,7 @@ def handler(event):
                 seed=seed,
             )
 
-        print("Generation complete, exporting to GLB...")
+        logger.info("Generation complete, exporting to GLB...")
 
         # Export to GLB format
         from trellis.utils import postprocessing_utils
@@ -136,11 +223,8 @@ def handler(event):
         generation_time = time.time() - start_time
         glb_size_mb = len(glb_bytes) / (1024 * 1024)
 
-        print(f"Export complete:")
-        print(f"  - Vertices: {vertex_count}")
-        print(f"  - Faces: {face_count}")
-        print(f"  - GLB size: {glb_size_mb:.2f} MB")
-        print(f"  - Total time: {generation_time:.1f}s")
+        logger.info(f"Export complete: vertices={vertex_count}, faces={face_count}, "
+                    f"size={glb_size_mb:.2f}MB, time={generation_time:.1f}s")
 
         # Clear CUDA cache to free memory for next job
         torch.cuda.empty_cache()
@@ -156,24 +240,22 @@ def handler(event):
 
     except torch.cuda.OutOfMemoryError as e:
         torch.cuda.empty_cache()
-        print(f"GPU OOM Error: {e}")
-        return {"error": f"GPU out of memory. Try a simpler prompt or lower texture_size. Details: {str(e)}"}
+        logger.error(f"GPU OOM Error: {e}")
+        return {"error": f"GPU out of memory. Try a simpler prompt or lower texture_size."}
 
     except Exception as e:
-        print(f"Error during generation: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Error during generation: {e}")
         return {"error": str(e)}
 
 
 # Pre-load the model at worker startup (not per-request)
-print("Pre-loading TRELLIS model...")
+logger.info("Pre-loading TRELLIS model...")
 try:
     load_pipeline()
-    print("Model pre-loaded successfully!")
+    logger.info("Model pre-loaded successfully!")
 except Exception as e:
-    print(f"Warning: Could not pre-load model: {e}")
-    print("Model will be loaded on first request")
+    logger.warning(f"Could not pre-load model: {e}")
+    logger.warning("Model will be loaded on first request")
 
 # Start the RunPod serverless handler
 runpod.serverless.start({"handler": handler})

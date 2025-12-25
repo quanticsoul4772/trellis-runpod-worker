@@ -72,7 +72,6 @@ ENV PYTHONPATH="/app/trellis:${PYTHONPATH}"
 # Copy worker files
 WORKDIR /app
 COPY handler.py .
-COPY src/ ./src/
 
 # Model will be downloaded at runtime to avoid build timeout
 # First run will take ~5 minutes to download ~8GB of weights

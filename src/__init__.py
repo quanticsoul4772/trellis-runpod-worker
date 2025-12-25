@@ -1,1 +1,0 @@
-# TRELLIS RunPod Worker
