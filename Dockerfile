@@ -72,7 +72,7 @@ RUN pip install --no-cache-dir \
     pymeshfix \
     igraph \
     transformers \
-    git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642571571c5d
+    git+https://github.com/EasternJournalist/utils3d.git
 
 # CRITICAL: Verify torchvision is properly installed and not shadowed
 RUN python -c "import torchvision; print(f'torchvision {torchvision.__version__} at {torchvision.__file__}')"
