@@ -1,16 +1,16 @@
 # =============================================================================
 # TRELLIS Text-to-3D RunPod Serverless Dockerfile
 # =============================================================================
-# Key insights from comprehensive analysis:
-# 1. Use CUDA 12.1 (not 12.4) for xformers compatibility with PyTorch 2.4.0
-# 2. Clone TRELLIS first, then install deps (PYTHONPATH order matters)
-# 3. Install easydict LAST to prevent shadowing by other packages
-# 4. Use --ignore-installed for distutils conflicts in base image
-# 5. Skip flash-attn (30min compile exceeds RunPod build timeout)
+# Key fixes based on comprehensive analysis:
+# 1. Clone TRELLIS first, then install deps (PYTHONPATH order matters)
+# 2. Install easydict LAST to prevent shadowing by other packages
+# 3. Use --ignore-installed for distutils conflicts in base image
+# 4. Skip flash-attn (30min compile exceeds RunPod build timeout)
+# 5. Skip explicit xformers install - let TRELLIS use native attention
 # =============================================================================
 
-# PyTorch 2.4.0 with CUDA 12.1 - compatible with xformers 0.0.27.post2
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.1.0-devel-ubuntu22.04
+# PyTorch 2.4.0 with CUDA 12.4 - only available version on RunPod
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 # Limit ninja parallelism to avoid OOM during CUDA kernel compilation
 ENV MAX_JOBS=4
@@ -41,27 +41,24 @@ RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 ENV PYTHONPATH="/app/trellis:${PYTHONPATH}"
 
 # =============================================================================
-# PHASE 2: Install xformers with correct version for PyTorch 2.4.0 + CUDA 12.1
-# Must be done BEFORE other packages to establish correct torch dependencies
+# PHASE 2: Verify base torch/torchvision are intact BEFORE any installs
 # =============================================================================
-RUN pip install --no-cache-dir xformers==0.0.27.post2 \
-    || pip install --no-cache-dir xformers \
-    || echo "WARNING: xformers install failed, TRELLIS will use slower attention"
-
-# Verify torch/torchvision versions are intact after xformers
 RUN python -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
     python -c "import torchvision; print(f'torchvision: {torchvision.__version__}')"
 
 # =============================================================================
 # PHASE 3: Install CUDA-specific packages (prebuilt wheels)
+# These should NOT touch torch/torchvision
 # =============================================================================
 
-# spconv for sparse convolutions (try cu121 first for CUDA 12.1)
-RUN pip install --no-cache-dir spconv-cu120 \
+# spconv for sparse convolutions (CUDA 12.4)
+RUN pip install --no-cache-dir spconv-cu124 \
+    || pip install --no-cache-dir spconv-cu120 \
     || echo "WARNING: spconv install failed, some features may be limited"
 
 # kaolin for 3D deep learning
-RUN pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu121.html \
+RUN pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu124.html \
+    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu121.html \
     || echo "WARNING: kaolin install failed, mesh operations may be limited"
 
 # nvdiffrast for differentiable rendering
@@ -71,6 +68,7 @@ RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
 # =============================================================================
 # PHASE 4: Install TRELLIS basic dependencies (from setup.sh --basic)
 # Use --ignore-installed to work around distutils packages (blinker, etc.)
+# DO NOT include easydict here - it gets shadowed by later packages
 # =============================================================================
 RUN pip install --no-cache-dir --ignore-installed \
     pillow \
@@ -83,19 +81,24 @@ RUN pip install --no-cache-dir --ignore-installed \
     rembg \
     onnxruntime \
     trimesh \
-    open3d \
     xatlas \
     pyvista \
     pymeshfix \
     igraph \
-    transformers \
     git+https://github.com/EasternJournalist/utils3d.git
 
+# Install open3d separately (large package, can cause issues)
+RUN pip install --no-cache-dir --ignore-installed open3d \
+    || echo "WARNING: open3d install failed"
+
+# Install transformers separately (installs many deps that can shadow packages)
+RUN pip install --no-cache-dir --ignore-installed transformers
+
 # =============================================================================
-# PHASE 5: Install easydict LAST (prevents shadowing by other packages)
+# PHASE 5: Install easydict ABSOLUTELY LAST (prevents shadowing)
 # This is the critical fix for "No module named 'easydict'" error
 # =============================================================================
-RUN pip install --no-cache-dir --force-reinstall easydict
+RUN pip install --no-cache-dir --force-reinstall --no-deps easydict
 
 # Verify easydict is importable
 RUN python -c "from easydict import EasyDict; print('easydict OK')"
@@ -111,7 +114,7 @@ RUN pip install --no-cache-dir \
     einops
 
 # =============================================================================
-# PHASE 7: Final verification - import TRELLIS pipeline
+# PHASE 7: Final verification - check all critical imports
 # =============================================================================
 RUN python -c "\
 import sys; \
