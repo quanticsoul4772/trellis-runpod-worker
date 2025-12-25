@@ -89,6 +89,7 @@ RUN pip install --no-cache-dir --ignore-installed \
     pyvista \
     pymeshfix \
     igraph \
+    plyfile \
     git+https://github.com/EasternJournalist/utils3d.git
 
 # Install open3d separately (large package, can cause issues)
