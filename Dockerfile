@@ -35,7 +35,8 @@ RUN pip install --no-cache-dir \
     imageio \
     imageio-ffmpeg \
     rembg \
-    onnxruntime
+    onnxruntime \
+    easydict
 
 # Install flash-attn for CUDA 12.x (prebuilt wheel)
 RUN pip install --no-cache-dir flash-attn --no-build-isolation \
