@@ -109,10 +109,23 @@ def load_pipeline() -> Any:
     start = time.time()
 
     try:
+        # Verify TRELLIS is accessible
+        import os
+        trellis_path = '/app/trellis'
+        if os.path.exists(trellis_path):
+            logger.info(f"TRELLIS path exists: {os.listdir(trellis_path)[:10]}")
+        else:
+            logger.error(f"TRELLIS path does not exist: {trellis_path}")
+
+        logger.info(f"sys.path: {sys.path[:5]}")
+
+        # Try importing TRELLIS
+        logger.info("Importing trellis.pipelines...")
+        from trellis.pipelines import TrellisTextTo3DPipeline
+        logger.info("Import successful!")
+
         # Ensure model is downloaded first
         model_path = download_model_if_needed()
-
-        from trellis.pipelines import TrellisTextTo3DPipeline
 
         logger.info(f"Loading pipeline from: {model_path}")
         PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
@@ -123,8 +136,15 @@ def load_pipeline() -> Any:
 
         return PIPELINE
 
+    except ImportError as e:
+        logger.error(f"Import error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise RuntimeError(f"TRELLIS import failed: {e}") from e
     except Exception as e:
         logger.error(f"Failed to load TRELLIS pipeline: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise RuntimeError(f"Pipeline initialization failed: {e}") from e
 
 
