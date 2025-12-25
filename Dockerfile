@@ -37,6 +37,10 @@ WORKDIR /app
 # =============================================================================
 RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
+# CRITICAL: Remove any conflicting 'trellis' package from PyPI
+# The trellis-python package uses the same namespace and shadows Microsoft TRELLIS
+RUN pip uninstall -y trellis trellis-python 2>/dev/null || true
+
 # Set PYTHONPATH early so TRELLIS modules are discoverable
 ENV PYTHONPATH="/app/trellis"
 
@@ -119,6 +123,11 @@ RUN pip install --no-cache-dir \
 # =============================================================================
 # PHASE 7: Final verification - check all critical imports
 # =============================================================================
+
+# CRITICAL: Remove any conflicting trellis package that might have been installed as a dependency
+RUN pip uninstall -y trellis trellis-python 2>/dev/null || true
+
+# Verify the correct TRELLIS is being used (Microsoft's, not PyPI's)
 RUN python -c "\
 import sys; \
 print('Python path:', sys.path[:3]); \
@@ -128,7 +137,11 @@ import torchvision; print(f'  torchvision {torchvision.__version__} OK'); \
 from easydict import EasyDict; print('  easydict OK'); \
 import trimesh; print('  trimesh OK'); \
 import transformers; print('  transformers OK'); \
-print('All critical imports successful!')"
+print('All critical imports successful!'); \
+print('Verifying Microsoft TRELLIS...'); \
+import trellis; print(f'  trellis module: {trellis.__file__}'); \
+assert '/app/trellis' in trellis.__file__, 'Wrong trellis package!'; \
+print('  Microsoft TRELLIS verified!')"
 
 # Try to import TRELLIS pipeline (may fail without GPU, but tests imports)
 RUN python -c "from trellis.pipelines import TrellisTextTo3DPipeline; print('TRELLIS pipeline import OK')" \
