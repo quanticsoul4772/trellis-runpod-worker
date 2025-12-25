@@ -1,5 +1,5 @@
-# Use CUDA 12.x base image - TRELLIS requires CUDA 12.x for flash-attn and other deps
-FROM runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04
+# TRELLIS requires PyTorch 2.4.0 - use matching RunPod base image
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 # Limit ninja parallelism to avoid OOM during compilation
 ENV MAX_JOBS=4
@@ -42,17 +42,17 @@ RUN pip install --no-cache-dir \
 # TRELLIS will use xformers as fallback for attention
 RUN echo "Skipping flash-attn (build timeout issue) - using xformers fallback"
 
-# Install xformers for memory-efficient attention (compatible with PyTorch 2.2)
+# Install xformers for memory-efficient attention (compatible with PyTorch 2.4)
 RUN pip install --no-cache-dir xformers || echo "xformers install failed, continuing..."
 
-# Install spconv for sparse convolutions (CUDA 12.1)
-RUN pip install --no-cache-dir spconv-cu120 \
-    || pip install --no-cache-dir spconv-cu121 \
+# Install spconv for sparse convolutions (CUDA 12.4)
+RUN pip install --no-cache-dir spconv-cu124 \
+    || pip install --no-cache-dir spconv-cu120 \
     || echo "spconv install failed, continuing..."
 
-# Install kaolin for 3D deep learning (prebuilt wheel for PyTorch 2.2, CUDA 12.1)
-RUN pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.2.0_cu121.html \
-    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.0_cu121.html \
+# Install kaolin for 3D deep learning (prebuilt wheel for PyTorch 2.4, CUDA 12.4)
+RUN pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu124.html \
+    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu121.html \
     || echo "kaolin install failed, continuing..."
 
 # Install nvdiffrast for differentiable rendering
@@ -67,8 +67,8 @@ WORKDIR /app/trellis
 RUN pip install --no-cache-dir $(grep -v -E "^(torch|torchvision|torchaudio)" requirements.txt | tr '\n' ' ') 2>/dev/null \
     || echo "Some TRELLIS requirements may need manual install"
 
-# Ensure torchvision matches base image PyTorch 2.2.0
-RUN pip install --no-cache-dir torchvision==0.17.0 --no-deps || echo "torchvision already installed"
+# Ensure torchvision matches base image PyTorch 2.4.0
+RUN pip install --no-cache-dir torchvision==0.19.0 --no-deps || echo "torchvision already installed"
 
 # Add TRELLIS to Python path
 ENV PYTHONPATH="/app/trellis"
