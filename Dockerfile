@@ -78,5 +78,14 @@ COPY handler.py .
 ENV TRELLIS_MODEL_PATH="/app/models/TRELLIS-text-xlarge"
 ENV HF_HOME="/app/hf_cache"
 
+# Debug: verify files exist during build
+RUN echo "=== BUILD DEBUG ===" && \
+    ls -la /app/ && \
+    echo "Python version:" && \
+    python --version && \
+    echo "handler.py exists:" && \
+    test -f /app/handler.py && echo "YES" || echo "NO" && \
+    head -5 /app/handler.py
+
 # Run Python directly - model download handled in handler.py
-CMD ["python", "-u", "handler.py"]
+CMD ["python", "-u", "/app/handler.py"]
