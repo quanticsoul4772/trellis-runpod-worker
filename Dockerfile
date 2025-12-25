@@ -38,9 +38,9 @@ RUN pip install --no-cache-dir \
     onnxruntime \
     easydict
 
-# Install flash-attn for CUDA 12.x (prebuilt wheel)
-RUN pip install --no-cache-dir flash-attn --no-build-isolation \
-    || echo "flash-attn install failed, will use fallback attention"
+# Skip flash-attn - compilation takes >30min and exceeds RunPod build timeout
+# TRELLIS will use xformers as fallback for attention
+RUN echo "Skipping flash-attn (build timeout issue) - using xformers fallback"
 
 # Install xformers for memory-efficient attention (compatible with PyTorch 2.2)
 RUN pip install --no-cache-dir xformers || echo "xformers install failed, continuing..."
@@ -68,7 +68,7 @@ RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null \
     || echo "Some TRELLIS requirements may need manual install"
 
 # Add TRELLIS to Python path
-ENV PYTHONPATH="/app/trellis:${PYTHONPATH}"
+ENV PYTHONPATH="/app/trellis"
 
 # Copy worker files
 WORKDIR /app
