@@ -124,8 +124,21 @@ RUN pip install --no-cache-dir \
 # PHASE 7: Final verification - check all critical imports
 # =============================================================================
 
-# CRITICAL: Remove any conflicting trellis package that might have been installed as a dependency
+# CRITICAL: Remove any conflicting trellis package from site-packages
+# pip uninstall may not work if it was installed as a dependency
 RUN pip uninstall -y trellis trellis-python 2>/dev/null || true
+
+# DEBUG: Show what trellis-related packages exist
+RUN echo "=== Checking for trellis packages ===" && \
+    pip list | grep -i trellis || echo "No trellis in pip list" && \
+    echo "=== Checking site-packages ===" && \
+    find /usr -name "trellis*" -type d 2>/dev/null || echo "No trellis dirs found" && \
+    ls -la /usr/local/lib/python3.11/dist-packages/ | grep -i trellis || echo "No trellis in dist-packages"
+
+# AGGRESSIVE FIX: Physically remove any trellis package from site-packages
+RUN rm -rf /usr/local/lib/python3.11/dist-packages/trellis* 2>/dev/null || true && \
+    rm -rf /usr/lib/python3.11/dist-packages/trellis* 2>/dev/null || true && \
+    rm -rf /usr/local/lib/python3.11/site-packages/trellis* 2>/dev/null || true
 
 # Verify the correct TRELLIS is being used (Microsoft's, not PyPI's)
 RUN python -c "\
