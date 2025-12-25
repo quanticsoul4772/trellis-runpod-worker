@@ -48,6 +48,15 @@ RUN pip install --no-cache-dir xformers==0.0.23 || echo "xformers install failed
 # Install spconv for sparse convolutions (CUDA 11.8)
 RUN pip install --no-cache-dir spconv-cu118
 
+# Install kaolin for 3D deep learning (prebuilt wheel for PyTorch 2.1, CUDA 11.8)
+RUN pip install --no-cache-dir kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.0_cu118.html \
+    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.0_cu118.html \
+    || echo "kaolin install failed, continuing..."
+
+# Install nvdiffrast for differentiable rendering (compile with limited parallelism)
+RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
+    || echo "nvdiffrast install failed, continuing..."
+
 # Clone TRELLIS
 RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
