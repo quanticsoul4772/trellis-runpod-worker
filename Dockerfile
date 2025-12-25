@@ -38,7 +38,7 @@ WORKDIR /app
 RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
 # Set PYTHONPATH early so TRELLIS modules are discoverable
-ENV PYTHONPATH="/app/trellis:${PYTHONPATH}"
+ENV PYTHONPATH="/app/trellis"
 
 # =============================================================================
 # PHASE 2: Verify base torch/torchvision are intact BEFORE any installs
@@ -128,13 +128,8 @@ import transformers; print('  transformers OK'); \
 print('All critical imports successful!')"
 
 # Try to import TRELLIS pipeline (may fail without GPU, but tests imports)
-RUN python -c "\
-try: \
-    from trellis.pipelines import TrellisTextTo3DPipeline; \
-    print('TRELLIS pipeline import OK'); \
-except Exception as e: \
-    print(f'TRELLIS import check: {e}'); \
-    print('(Expected if no GPU during build)')"
+RUN python -c "from trellis.pipelines import TrellisTextTo3DPipeline; print('TRELLIS pipeline import OK')" \
+    || echo "TRELLIS import check failed (expected if no GPU during build)"
 
 # =============================================================================
 # PHASE 8: Copy handler and configure runtime
