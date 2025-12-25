@@ -1,4 +1,5 @@
-FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
+# Use CUDA 12.x base image - TRELLIS requires CUDA 12.x for flash-attn and other deps
+FROM runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04
 
 # Limit ninja parallelism to avoid OOM during compilation
 ENV MAX_JOBS=4
@@ -36,35 +37,34 @@ RUN pip install --no-cache-dir \
     rembg \
     onnxruntime
 
-# Install prebuilt flash-attn wheel (much faster than compiling)
-# Using the prebuilt wheel for PyTorch 2.1, CUDA 11.8, Python 3.10
-RUN pip install --no-cache-dir flash-attn==2.5.9.post1 --no-build-isolation \
-    || pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.5.9.post1/flash_attn-2.5.9.post1+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl \
+# Install flash-attn for CUDA 12.x (prebuilt wheel)
+RUN pip install --no-cache-dir flash-attn --no-build-isolation \
     || echo "flash-attn install failed, will use fallback attention"
 
-# Install xformers for memory-efficient attention (prebuilt)
-RUN pip install --no-cache-dir xformers==0.0.23 || echo "xformers install failed, continuing..."
+# Install xformers for memory-efficient attention (compatible with PyTorch 2.2)
+RUN pip install --no-cache-dir xformers || echo "xformers install failed, continuing..."
 
-# Install spconv for sparse convolutions (CUDA 11.8)
-RUN pip install --no-cache-dir spconv-cu118
+# Install spconv for sparse convolutions (CUDA 12.1)
+RUN pip install --no-cache-dir spconv-cu120 \
+    || pip install --no-cache-dir spconv-cu121 \
+    || echo "spconv install failed, continuing..."
 
-# Install kaolin for 3D deep learning (prebuilt wheel for PyTorch 2.1, CUDA 11.8)
-RUN pip install --no-cache-dir kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.0_cu118.html \
-    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.0_cu118.html \
+# Install kaolin for 3D deep learning (prebuilt wheel for PyTorch 2.2, CUDA 12.1)
+RUN pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.2.0_cu121.html \
+    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.0_cu121.html \
     || echo "kaolin install failed, continuing..."
 
-# Install nvdiffrast for differentiable rendering (compile with limited parallelism)
+# Install nvdiffrast for differentiable rendering
 RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
     || echo "nvdiffrast install failed, continuing..."
 
 # Clone TRELLIS
 RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
-# Install TRELLIS requirements (with error tolerance)
+# Install TRELLIS requirements (skip torch since base image has it)
 WORKDIR /app/trellis
-RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || \
-    pip install --no-cache-dir torch torchvision torchaudio || \
-    echo "Some TRELLIS requirements may be missing"
+RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null \
+    || echo "Some TRELLIS requirements may need manual install"
 
 # Add TRELLIS to Python path
 ENV PYTHONPATH="/app/trellis:${PYTHONPATH}"
@@ -74,23 +74,15 @@ WORKDIR /app
 COPY handler.py .
 
 # Model will be downloaded at runtime to avoid build timeout
-# First run will take ~5 minutes to download ~8GB of weights
 ENV TRELLIS_MODEL_PATH="/app/models/TRELLIS-text-xlarge"
 ENV HF_HOME="/app/hf_cache"
 
-# Debug: verify files and Python path during build
-RUN echo "=== BUILD DEBUG ===" && \
-    ls -la /app/ && \
-    echo "Python location:" && \
-    which python && \
-    which python3 && \
+# Verify setup during build
+RUN echo "=== BUILD VERIFICATION ===" && \
     python --version && \
-    echo "handler.py exists:" && \
-    test -f /app/handler.py && echo "YES" || echo "NO" && \
-    head -5 /app/handler.py && \
-    echo "Syntax check:" && \
+    python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.version.cuda}')" && \
+    ls -la /app/handler.py && \
     python -m py_compile /app/handler.py && echo "Syntax OK"
 
-# Run Python directly - model download handled in handler.py
-# Using /usr/bin/python3 explicitly in case PATH issues at runtime
-CMD ["/usr/bin/python3", "-u", "/app/handler.py"]
+# Run the handler
+CMD ["python", "-u", "/app/handler.py"]
