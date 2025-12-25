@@ -62,10 +62,13 @@ RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
 # Clone TRELLIS
 RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
-# Install TRELLIS requirements (skip torch since base image has it)
+# Install TRELLIS requirements (skip torch/torchvision since base image has compatible versions)
 WORKDIR /app/trellis
-RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null \
+RUN pip install --no-cache-dir $(grep -v -E "^(torch|torchvision|torchaudio)" requirements.txt | tr '\n' ' ') 2>/dev/null \
     || echo "Some TRELLIS requirements may need manual install"
+
+# Ensure torchvision matches base image PyTorch 2.2.0
+RUN pip install --no-cache-dir torchvision==0.17.0 --no-deps || echo "torchvision already installed"
 
 # Add TRELLIS to Python path
 ENV PYTHONPATH="/app/trellis"
