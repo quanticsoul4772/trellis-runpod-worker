@@ -59,6 +59,34 @@ if torch.cuda.is_available():
     logger.info(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
 logger.info("=" * 50)
 
+
+def download_model_if_needed():
+    """Download TRELLIS model weights if not already present."""
+    model_path = os.environ.get('TRELLIS_MODEL_PATH', '/app/models/TRELLIS-text-xlarge')
+
+    if os.path.exists(model_path) and os.path.isdir(model_path):
+        # Check if it has model files
+        files = os.listdir(model_path)
+        if len(files) > 0:
+            logger.info(f"Model already exists at {model_path} ({len(files)} files)")
+            return model_path
+
+    logger.info("Downloading TRELLIS model weights (this may take several minutes)...")
+    try:
+        from huggingface_hub import snapshot_download
+
+        downloaded_path = snapshot_download(
+            "microsoft/TRELLIS-text-xlarge",
+            local_dir=model_path,
+            local_dir_use_symlinks=False
+        )
+        logger.info(f"Model downloaded to: {downloaded_path}")
+        return downloaded_path
+    except Exception as e:
+        logger.error(f"Failed to download model: {e}")
+        # Fall back to letting the pipeline download it
+        return "microsoft/TRELLIS-text-xlarge"
+
 # Global pipeline - loaded once at startup
 PIPELINE = None
 
@@ -81,17 +109,13 @@ def load_pipeline() -> Any:
     start = time.time()
 
     try:
+        # Ensure model is downloaded first
+        model_path = download_model_if_needed()
+
         from trellis.pipelines import TrellisTextTo3DPipeline
 
-        model_path = os.environ.get('TRELLIS_MODEL_PATH', 'microsoft/TRELLIS-text-xlarge')
-
-        if os.path.exists(model_path):
-            logger.info(f"Loading from local path: {model_path}")
-            PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
-        else:
-            logger.info(f"Loading from HuggingFace: {model_path}")
-            PIPELINE = TrellisTextTo3DPipeline.from_pretrained('microsoft/TRELLIS-text-xlarge')
-
+        logger.info(f"Loading pipeline from: {model_path}")
+        PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
         PIPELINE.cuda()
 
         elapsed = time.time() - start

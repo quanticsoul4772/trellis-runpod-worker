@@ -78,13 +78,5 @@ COPY handler.py .
 ENV TRELLIS_MODEL_PATH="/app/models/TRELLIS-text-xlarge"
 ENV HF_HOME="/app/hf_cache"
 
-# Create startup script that handles model download
-RUN echo '#!/bin/bash\n\
-if [ ! -d "/app/models/TRELLIS-text-xlarge" ]; then\n\
-    echo "Downloading TRELLIS model weights (first run only)..."\n\
-    python -c "from huggingface_hub import snapshot_download; snapshot_download(\"microsoft/TRELLIS-text-xlarge\", local_dir=\"/app/models/TRELLIS-text-xlarge\")"\n\
-fi\n\
-exec python -u handler.py\n\
-' > /app/start.sh && chmod +x /app/start.sh
-
-CMD ["/app/start.sh"]
+# Run Python directly - model download handled in handler.py
+CMD ["python", "-u", "handler.py"]
