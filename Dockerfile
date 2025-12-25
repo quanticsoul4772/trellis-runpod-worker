@@ -94,6 +94,9 @@ RUN pip install --no-cache-dir --ignore-installed open3d \
 # Install transformers separately (installs many deps that can shadow packages)
 RUN pip install --no-cache-dir --ignore-installed transformers
 
+# Pin numpy < 2.4 for Numba compatibility (transformers pulls in numpy 2.4 which breaks Numba)
+RUN pip install --no-cache-dir "numpy<2.4,>=1.24"
+
 # =============================================================================
 # PHASE 5: Install easydict ABSOLUTELY LAST (prevents shadowing)
 # This is the critical fix for "No module named 'easydict'" error
