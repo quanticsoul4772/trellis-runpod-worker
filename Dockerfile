@@ -63,8 +63,8 @@ RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
 RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
 # Install TRELLIS basic dependencies (from setup.sh --basic)
-# These are the actual dependencies, not from requirements.txt which doesn't exist
-RUN pip install --no-cache-dir \
+# Use --ignore-installed to work around distutils packages in base image
+RUN pip install --no-cache-dir --ignore-installed \
     opencv-python-headless \
     open3d \
     xatlas \
