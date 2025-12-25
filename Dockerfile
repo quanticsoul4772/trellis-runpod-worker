@@ -1,5 +1,9 @@
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
+# Limit ninja parallelism to avoid OOM during compilation
+ENV MAX_JOBS=4
+ENV NINJA_MAX_JOBS=4
+
 # System dependencies for TRELLIS
 RUN apt-get update && apt-get install -y \
     git \
@@ -10,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -31,21 +36,26 @@ RUN pip install --no-cache-dir \
     rembg \
     onnxruntime
 
-# Clone TRELLIS
-RUN git clone https://github.com/microsoft/TRELLIS.git /app/trellis
+# Install prebuilt flash-attn wheel (much faster than compiling)
+# Using the prebuilt wheel for PyTorch 2.1, CUDA 11.8, Python 3.10
+RUN pip install --no-cache-dir flash-attn==2.5.9.post1 --no-build-isolation \
+    || pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.5.9.post1/flash_attn-2.5.9.post1+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl \
+    || echo "flash-attn install failed, will use fallback attention"
 
-# Install TRELLIS requirements
-WORKDIR /app/trellis
-RUN pip install --no-cache-dir -r requirements.txt || true
+# Install xformers for memory-efficient attention (prebuilt)
+RUN pip install --no-cache-dir xformers==0.0.23 || echo "xformers install failed, continuing..."
 
 # Install spconv for sparse convolutions (CUDA 11.8)
 RUN pip install --no-cache-dir spconv-cu118
 
-# Install flash-attn (may take a while to compile)
-RUN pip install --no-cache-dir flash-attn --no-build-isolation || echo "flash-attn install failed, continuing..."
+# Clone TRELLIS
+RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
 
-# Install xformers for memory-efficient attention
-RUN pip install --no-cache-dir xformers || echo "xformers install failed, continuing..."
+# Install TRELLIS requirements (with error tolerance)
+WORKDIR /app/trellis
+RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || \
+    pip install --no-cache-dir torch torchvision torchaudio || \
+    echo "Some TRELLIS requirements may be missing"
 
 # Add TRELLIS to Python path
 ENV PYTHONPATH="/app/trellis:${PYTHONPATH}"
@@ -55,10 +65,18 @@ WORKDIR /app
 COPY handler.py .
 COPY src/ ./src/
 
-# Pre-download model weights (baked into image for fast cold starts)
-# This downloads ~8GB of model weights during build
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('microsoft/TRELLIS-text-xlarge', local_dir='/app/models/TRELLIS-text-xlarge')" || echo "Model download will happen at runtime"
-
+# Model will be downloaded at runtime to avoid build timeout
+# First run will take ~5 minutes to download ~8GB of weights
 ENV TRELLIS_MODEL_PATH="/app/models/TRELLIS-text-xlarge"
+ENV HF_HOME="/app/hf_cache"
 
-CMD ["python", "-u", "handler.py"]
+# Create startup script that handles model download
+RUN echo '#!/bin/bash\n\
+if [ ! -d "/app/models/TRELLIS-text-xlarge" ]; then\n\
+    echo "Downloading TRELLIS model weights (first run only)..."\n\
+    python -c "from huggingface_hub import snapshot_download; snapshot_download(\"microsoft/TRELLIS-text-xlarge\", local_dir=\"/app/models/TRELLIS-text-xlarge\")"\n\
+fi\n\
+exec python -u handler.py\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]
