@@ -68,7 +68,10 @@ RUN pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaoli
 
 # nvdiffrast for differentiable rendering (required for mesh export)
 # CRITICAL: --no-build-isolation required so nvdiffrast can access PyTorch during CUDA compilation
-RUN pip install --no-cache-dir --no-build-isolation git+https://github.com/NVlabs/nvdiffrast.git \
+# Set TORCH_CUDA_ARCH_LIST because no GPU is available during Docker build
+# Covers: V100(7.0), T4(7.5), A100(8.0), RTX3090/A40(8.6), RTX4090/L40(8.9), H100(9.0)
+RUN TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0" \
+    pip install --no-cache-dir --no-build-isolation git+https://github.com/NVlabs/nvdiffrast.git \
     || { echo "ERROR: nvdiffrast install failed"; exit 1; }
 
 # flash_attn from prebuilt wheel (avoids 30+ min compilation)
