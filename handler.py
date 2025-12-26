@@ -144,9 +144,18 @@ def load_pipeline() -> Any:
         # Ensure model is downloaded first
         model_path = download_model_if_needed()
 
-        logger.info(f"Loading pipeline from: {model_path}")
-        PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
-        PIPELINE.cuda()
+        # Change to model directory so relative paths in pipeline.json resolve correctly
+        original_cwd = os.getcwd()
+        os.chdir(model_path)
+        logger.info(f"Changed working directory to: {model_path}")
+
+        try:
+            logger.info(f"Loading pipeline from: {model_path}")
+            PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
+            PIPELINE.cuda()
+        finally:
+            os.chdir(original_cwd)
+            logger.info(f"Restored working directory to: {original_cwd}")
 
         elapsed = time.time() - start
         logger.info(f"TRELLIS pipeline loaded in {elapsed:.1f}s")
