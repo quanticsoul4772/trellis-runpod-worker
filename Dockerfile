@@ -33,9 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # =============================================================================
-# PHASE 1: Clone TRELLIS first (establishes PYTHONPATH priority)
+# PHASE 1: Clone TRELLIS with submodules (flexicubes is a submodule)
 # =============================================================================
-RUN git clone --depth 1 https://github.com/microsoft/TRELLIS.git /app/trellis
+RUN git clone --depth 1 --recurse-submodules https://github.com/microsoft/TRELLIS.git /app/trellis
 
 # CRITICAL: Remove any conflicting 'trellis' package from PyPI
 # The trellis-python package uses the same namespace and shadows Microsoft TRELLIS
