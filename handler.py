@@ -22,14 +22,25 @@ Output:
 
 from __future__ import annotations
 
+# CRITICAL: Set attention backend BEFORE any other imports
+# This must happen before torch or any TRELLIS code is imported
+import os
+import sys
+
+# Add TRELLIS to path FIRST
+sys.path.insert(0, '/app/trellis')
+
+# Set attention backend to use PyTorch's built-in SDPA (no extra deps)
+os.environ['ATTN_BACKEND'] = 'sdpa'
+os.environ['SPCONV_ALGO'] = 'native'
+
+# Now import everything else
 import runpod
 import base64
 import logging
 import time
 import torch
 import random
-import os
-import sys
 from io import BytesIO
 from typing import Any, Optional
 
@@ -47,14 +58,6 @@ MIN_TEXTURE_SIZE = 128
 MAX_TEXTURE_SIZE = 4096
 MIN_SIMPLIFY = 0.0
 MAX_SIMPLIFY = 1.0
-
-# Add TRELLIS to path
-sys.path.insert(0, '/app/trellis')
-
-# Use PyTorch's built-in SDPA attention (no extra dependencies needed)
-# Options: 'flash-attn', 'xformers', 'sdpa' (PyTorch 2.0+)
-os.environ['ATTN_BACKEND'] = 'sdpa'
-os.environ['SPCONV_ALGO'] = 'native'
 
 # Set HuggingFace token for gated models
 hf_token = os.environ.get('HF_TOKEN')
