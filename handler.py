@@ -22,23 +22,12 @@ Output:
 
 from __future__ import annotations
 
-# CRITICAL: Set attention backend BEFORE any other imports
-# This must happen before torch or any TRELLIS code is imported
 import os
 import sys
 
-# Add TRELLIS to path FIRST
+# Add TRELLIS to path
 sys.path.insert(0, '/app/trellis')
 
-# Set attention backend to use PyTorch's built-in SDPA (no extra deps)
-os.environ['ATTN_BACKEND'] = 'sdpa'
-os.environ['SPCONV_ALGO'] = 'native'
-
-# Debug: verify env vars are set
-print(f"[EARLY] ATTN_BACKEND = {os.environ.get('ATTN_BACKEND')}")
-print(f"[EARLY] SPCONV_ALGO = {os.environ.get('SPCONV_ALGO')}")
-
-# Now import everything else
 import runpod
 import base64
 import logging

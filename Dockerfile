@@ -70,11 +70,10 @@ RUN pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaoli
 RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
     || echo "WARNING: nvdiffrast install failed, rendering may be limited"
 
-# xformers for attention (alternative to flash_attn which takes 30+ min to compile)
-# Use --no-deps to prevent upgrading torch/torchvision
-RUN pip install --no-cache-dir --no-deps xformers==0.0.27.post2 \
-    || pip install --no-cache-dir --no-deps xformers \
-    || echo "WARNING: xformers install failed, will try native attention"
+# flash_attn from prebuilt wheel (avoids 30+ min compilation)
+# Wheel for Python 3.11, PyTorch 2.4, CUDA 12
+RUN pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.4cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
+    || echo "WARNING: flash_attn wheel install failed"
 
 # =============================================================================
 # PHASE 4: Install TRELLIS basic dependencies (from setup.sh --basic)
@@ -177,8 +176,7 @@ COPY handler.py .
 ENV TRELLIS_MODEL_PATH="/app/models/TRELLIS-text-xlarge"
 ENV HF_HOME="/app/hf_cache"
 
-# CRITICAL: Set attention backend to SDPA (avoids flash_attn dependency)
-ENV ATTN_BACKEND="sdpa"
+# spconv algorithm selection
 ENV SPCONV_ALGO="native"
 
 # Final build verification
