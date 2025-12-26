@@ -67,7 +67,8 @@ RUN pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaoli
     || { echo "ERROR: kaolin install failed - required for mesh generation"; exit 1; }
 
 # nvdiffrast for differentiable rendering (required for mesh export)
-RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
+# CRITICAL: --no-build-isolation required so nvdiffrast can access PyTorch during CUDA compilation
+RUN pip install --no-cache-dir --no-build-isolation git+https://github.com/NVlabs/nvdiffrast.git \
     || { echo "ERROR: nvdiffrast install failed"; exit 1; }
 
 # flash_attn from prebuilt wheel (avoids 30+ min compilation)
