@@ -179,6 +179,13 @@ ENV HF_HOME="/app/hf_cache"
 # spconv algorithm selection
 ENV SPCONV_ALGO="native"
 
+# Pre-download CLIP model to avoid runtime download issues
+RUN python -c "from transformers import CLIPModel, CLIPTokenizer; \
+    CLIPModel.from_pretrained('openai/clip-vit-large-patch14'); \
+    CLIPTokenizer.from_pretrained('openai/clip-vit-large-patch14'); \
+    print('CLIP model pre-downloaded')" \
+    || echo "WARNING: Could not pre-download CLIP model"
+
 # Final build verification
 RUN echo "=== BUILD COMPLETE ===" && \
     python --version && \
