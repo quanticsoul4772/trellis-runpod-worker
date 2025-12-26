@@ -51,6 +51,14 @@ MAX_SIMPLIFY = 1.0
 # Add TRELLIS to path
 sys.path.insert(0, '/app/trellis')
 
+# Set HuggingFace token for gated models
+hf_token = os.environ.get('HF_TOKEN')
+if hf_token:
+    os.environ['HUGGING_FACE_HUB_TOKEN'] = hf_token
+    logger.info("HuggingFace token configured")
+else:
+    logger.warning("HF_TOKEN not set - may fail to download gated models")
+
 logger.info("=" * 50)
 logger.info("TRELLIS Text-to-3D RunPod Worker Starting...")
 logger.info(f"CUDA Available: {torch.cuda.is_available()}")
@@ -73,12 +81,19 @@ def download_model_if_needed():
 
     logger.info("Downloading TRELLIS model weights (this may take several minutes)...")
     try:
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import snapshot_download, login
+
+        # Login with token if available
+        hf_token = os.environ.get('HF_TOKEN')
+        if hf_token:
+            login(token=hf_token)
+            logger.info("Logged in to HuggingFace")
 
         downloaded_path = snapshot_download(
             "microsoft/TRELLIS-text-xlarge",
             local_dir=model_path,
-            local_dir_use_symlinks=False
+            local_dir_use_symlinks=False,
+            token=hf_token
         )
         logger.info(f"Model downloaded to: {downloaded_path}")
         return downloaded_path
