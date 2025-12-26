@@ -177,6 +177,10 @@ COPY handler.py .
 ENV TRELLIS_MODEL_PATH="/app/models/TRELLIS-text-xlarge"
 ENV HF_HOME="/app/hf_cache"
 
+# CRITICAL: Set attention backend to SDPA (avoids flash_attn dependency)
+ENV ATTN_BACKEND="sdpa"
+ENV SPCONV_ALGO="native"
+
 # Final build verification
 RUN echo "=== BUILD COMPLETE ===" && \
     python --version && \

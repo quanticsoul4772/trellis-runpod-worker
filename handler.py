@@ -34,6 +34,10 @@ sys.path.insert(0, '/app/trellis')
 os.environ['ATTN_BACKEND'] = 'sdpa'
 os.environ['SPCONV_ALGO'] = 'native'
 
+# Debug: verify env vars are set
+print(f"[EARLY] ATTN_BACKEND = {os.environ.get('ATTN_BACKEND')}")
+print(f"[EARLY] SPCONV_ALGO = {os.environ.get('SPCONV_ALGO')}")
+
 # Now import everything else
 import runpod
 import base64
