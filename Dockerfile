@@ -71,7 +71,9 @@ RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
     || echo "WARNING: nvdiffrast install failed, rendering may be limited"
 
 # xformers for attention (alternative to flash_attn which takes 30+ min to compile)
-RUN pip install --no-cache-dir xformers \
+# Use --no-deps to prevent upgrading torch/torchvision
+RUN pip install --no-cache-dir --no-deps xformers==0.0.27.post2 \
+    || pip install --no-cache-dir --no-deps xformers \
     || echo "WARNING: xformers install failed, will try native attention"
 
 # =============================================================================
