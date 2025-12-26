@@ -70,6 +70,10 @@ RUN pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaoli
 RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
     || echo "WARNING: nvdiffrast install failed, rendering may be limited"
 
+# xformers for attention (alternative to flash_attn which takes 30+ min to compile)
+RUN pip install --no-cache-dir xformers \
+    || echo "WARNING: xformers install failed, will try native attention"
+
 # =============================================================================
 # PHASE 4: Install TRELLIS basic dependencies (from setup.sh --basic)
 # Use --ignore-installed to work around distutils packages (blinker, etc.)
