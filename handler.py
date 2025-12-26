@@ -51,6 +51,10 @@ MAX_SIMPLIFY = 1.0
 # Add TRELLIS to path
 sys.path.insert(0, '/app/trellis')
 
+# Disable flash_attn, use xformers instead (flash_attn takes 30+ min to compile)
+os.environ['ATTN_BACKEND'] = 'xformers'
+os.environ['SPCONV_ALGO'] = 'native'
+
 # Set HuggingFace token for gated models
 hf_token = os.environ.get('HF_TOKEN')
 if hf_token:
