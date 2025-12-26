@@ -51,8 +51,9 @@ MAX_SIMPLIFY = 1.0
 # Add TRELLIS to path
 sys.path.insert(0, '/app/trellis')
 
-# Disable flash_attn, use xformers instead (flash_attn takes 30+ min to compile)
-os.environ['ATTN_BACKEND'] = 'xformers'
+# Use PyTorch's built-in SDPA attention (no extra dependencies needed)
+# Options: 'flash-attn', 'xformers', 'sdpa' (PyTorch 2.0+)
+os.environ['ATTN_BACKEND'] = 'sdpa'
 os.environ['SPCONV_ALGO'] = 'native'
 
 # Set HuggingFace token for gated models
