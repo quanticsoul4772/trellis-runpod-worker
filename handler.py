@@ -73,6 +73,42 @@ if torch.cuda.is_available():
 logger.info("=" * 50)
 
 
+def fix_pipeline_paths(model_path: str) -> None:
+    """Fix relative ckpts/ paths in pipeline.json to absolute paths.
+
+    The pipeline.json has a mix of:
+    - Relative paths: "ckpts/ss_flow_txt_dit_XL_16l8_fp16"
+    - HuggingFace paths: "JeffreyXiang/TRELLIS-image-large/ckpts/..."
+
+    This converts relative paths to absolute paths so they load correctly.
+    """
+    import json
+
+    pipeline_json_path = os.path.join(model_path, 'pipeline.json')
+    if not os.path.exists(pipeline_json_path):
+        logger.warning(f"pipeline.json not found at {pipeline_json_path}")
+        return
+
+    with open(pipeline_json_path, 'r') as f:
+        config = json.load(f)
+
+    modified = False
+    models = config.get('args', {}).get('models', {})
+
+    for key, value in models.items():
+        # Only fix paths that start with "ckpts/" (relative paths)
+        if isinstance(value, str) and value.startswith('ckpts/'):
+            absolute_path = os.path.join(model_path, value)
+            models[key] = absolute_path
+            logger.info(f"Fixed path {key}: {value} -> {absolute_path}")
+            modified = True
+
+    if modified:
+        with open(pipeline_json_path, 'w') as f:
+            json.dump(config, f, indent=2)
+        logger.info("Updated pipeline.json with absolute paths")
+
+
 def download_model_if_needed():
     """Download TRELLIS model weights if not already present."""
     model_path = os.environ.get('TRELLIS_MODEL_PATH', '/app/models/TRELLIS-text-xlarge')
@@ -149,18 +185,12 @@ def load_pipeline() -> Any:
         # Ensure model is downloaded first
         model_path = download_model_if_needed()
 
-        # Change to model directory so relative paths in pipeline.json resolve correctly
-        original_cwd = os.getcwd()
-        os.chdir(model_path)
-        logger.info(f"Changed working directory to: {model_path}")
+        # Fix relative paths in pipeline.json to be absolute
+        fix_pipeline_paths(model_path)
 
-        try:
-            logger.info(f"Loading pipeline from: {model_path}")
-            PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
-            PIPELINE.cuda()
-        finally:
-            os.chdir(original_cwd)
-            logger.info(f"Restored working directory to: {original_cwd}")
+        logger.info(f"Loading pipeline from: {model_path}")
+        PIPELINE = TrellisTextTo3DPipeline.from_pretrained(model_path)
+        PIPELINE.cuda()
 
         elapsed = time.time() - start
         logger.info(f"TRELLIS pipeline loaded in {elapsed:.1f}s")
