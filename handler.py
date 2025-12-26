@@ -89,8 +89,8 @@ def download_model_if_needed():
             login(token=hf_token)
             logger.info("Logged in to HuggingFace")
 
-        # Use gqk fork since Microsoft deleted original repos
-        model_repo = "gqk/TRELLIS-text-xlarge-fork"
+        # Use JeffreyXiang's repo (original author mirror)
+        model_repo = "JeffreyXiang/TRELLIS-text-xlarge"
         downloaded_path = snapshot_download(
             model_repo,
             local_dir=model_path,
@@ -102,7 +102,7 @@ def download_model_if_needed():
     except Exception as e:
         logger.error(f"Failed to download model: {e}")
         # Fall back to letting the pipeline download it
-        return "gqk/TRELLIS-text-xlarge-fork"
+        return "JeffreyXiang/TRELLIS-text-xlarge"
 
 # Global pipeline - loaded once at startup
 PIPELINE = None
