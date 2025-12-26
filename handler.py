@@ -56,9 +56,14 @@ MAX_SIMPLIFY = 1.0
 hf_token = os.environ.get('HF_TOKEN')
 if hf_token:
     os.environ['HUGGING_FACE_HUB_TOKEN'] = hf_token
+    os.environ['HF_TOKEN'] = hf_token  # Also set for transformers
     logger.info("HuggingFace token configured")
 else:
     logger.warning("HF_TOKEN not set - may fail to download gated models")
+
+# Ensure transformers doesn't use offline mode
+os.environ['TRANSFORMERS_OFFLINE'] = '0'
+os.environ['HF_HUB_OFFLINE'] = '0'
 
 logger.info("=" * 50)
 logger.info("TRELLIS Text-to-3D RunPod Worker Starting...")
@@ -103,6 +108,14 @@ def fix_pipeline_paths(model_path: str) -> None:
         with open(pipeline_json_path, 'w') as f:
             json.dump(config, f, indent=2)
         logger.info("Updated pipeline.json with absolute paths")
+
+    # Check for directory conflicts that could confuse transformers
+    openai_dir = os.path.join(model_path, 'openai')
+    if os.path.exists(openai_dir):
+        logger.warning(f"Found conflicting 'openai' directory at {openai_dir}")
+        import shutil
+        shutil.rmtree(openai_dir)
+        logger.info("Removed conflicting 'openai' directory")
 
 
 def download_model_if_needed():
