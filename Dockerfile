@@ -60,10 +60,11 @@ RUN pip install --no-cache-dir spconv-cu124 \
     || pip install --no-cache-dir spconv-cu120 \
     || echo "WARNING: spconv install failed, some features may be limited"
 
-# kaolin for 3D deep learning
-RUN pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu124.html \
-    || pip install --no-cache-dir kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu121.html \
-    || echo "WARNING: kaolin install failed, mesh operations may be limited"
+# kaolin for 3D deep learning (required by flexicubes)
+# Use --ignore-installed to work around distutils conflicts
+RUN pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu124.html \
+    || pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu121.html \
+    || { echo "ERROR: kaolin install failed - required for mesh generation"; exit 1; }
 
 # nvdiffrast for differentiable rendering
 RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
