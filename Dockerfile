@@ -66,9 +66,9 @@ RUN pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaoli
     || pip install --no-cache-dir --ignore-installed kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu121.html \
     || { echo "ERROR: kaolin install failed - required for mesh generation"; exit 1; }
 
-# nvdiffrast for differentiable rendering
+# nvdiffrast for differentiable rendering (required for mesh export)
 RUN pip install --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git \
-    || echo "WARNING: nvdiffrast install failed, rendering may be limited"
+    || { echo "ERROR: nvdiffrast install failed"; exit 1; }
 
 # flash_attn from prebuilt wheel (avoids 30+ min compilation)
 # Wheel for Python 3.11, PyTorch 2.4, CUDA 12
