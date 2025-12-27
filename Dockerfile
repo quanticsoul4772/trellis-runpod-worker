@@ -100,7 +100,7 @@ RUN pip install --no-cache-dir --ignore-installed \
     pymeshfix \
     igraph \
     plyfile \
-    git+https://github.com/EasternJournalist/utils3d.git
+    "utils3d @ git+https://github.com/EasternJournalist/utils3d.git@e87d195da7270f575d9680d884d6aad2588864aa"
 
 # Install open3d separately (large package, can cause issues)
 RUN pip install --no-cache-dir --ignore-installed open3d \
