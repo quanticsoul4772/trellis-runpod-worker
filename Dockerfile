@@ -74,6 +74,14 @@ RUN TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0" \
     pip install --no-cache-dir --no-build-isolation git+https://github.com/NVlabs/nvdiffrast.git \
     || { echo "ERROR: nvdiffrast install failed"; exit 1; }
 
+# diff-gaussian-rasterization for Gaussian splatting (required by TRELLIS)
+# Clone mip-splatting and build the submodule
+RUN git clone --depth 1 https://github.com/autonomousvision/mip-splatting.git /tmp/mip-splatting && \
+    TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0" \
+    pip install --no-cache-dir --no-build-isolation /tmp/mip-splatting/submodules/diff-gaussian-rasterization/ && \
+    rm -rf /tmp/mip-splatting \
+    || { echo "ERROR: diff-gaussian-rasterization install failed"; exit 1; }
+
 # flash_attn from prebuilt wheel (avoids 30+ min compilation)
 # Wheel for Python 3.11, PyTorch 2.4, CUDA 12
 RUN pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.4cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
